@@ -16,6 +16,7 @@ import transformers
 
 from torch import nn
 from torch.nn import CrossEntropyLoss
+from peft import LoraConfig, get_peft_model
 from transformers import GenerationConfig
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.modeling_utils import PreTrainedModel
@@ -132,6 +133,7 @@ class InternVLUChatModel(PreTrainedModel):
         self.img_frame_break_token_id = None
         self.pad_token_id = None
         self.conv_template = get_conv_template(self.template)
+        self.llm_arch_name = config.llm_config.architectures[0]
 
         if hasattr(config, "system_message"):
             self.system_message = config.system_message
@@ -142,8 +144,54 @@ class InternVLUChatModel(PreTrainedModel):
         self.special_token_embedding = nn.Embedding(
             len(SPECIAL_TOKEN_LIST), config.llm_config.hidden_size
         )
+        if config.use_backbone_lora:
+            self.wrap_backbone_lora(
+                r=config.use_backbone_lora,
+                lora_alpha=2 * config.use_backbone_lora,
+            )
+        if config.use_llm_lora:
+            self.wrap_llm_lora(
+                r=config.use_llm_lora,
+                lora_alpha=2 * config.use_llm_lora,
+            )
         self.special_token_list = copy.deepcopy(SPECIAL_TOKEN_LIST)
         self.special_token_id_list = None  # Remember to initialize this in the training script after tokenizer is loaded
+
+    def wrap_backbone_lora(self, r=128, lora_alpha=256, lora_dropout=0.05):
+        lora_config = LoraConfig(
+            r=r,
+            target_modules=['attn.qkv', 'attn.proj', 'mlp.fc1', 'mlp.fc2'],
+            lora_alpha=lora_alpha,
+            lora_dropout=lora_dropout,
+        )
+        self.vision_model = get_peft_model(self.vision_model, lora_config)
+        self.vision_model.print_trainable_parameters()
+
+    def wrap_llm_lora(self, r=128, lora_alpha=256, lora_dropout=0.05):
+        if self.llm_arch_name == 'InternLM2ForCausalLM':
+            target_modules = ['attention.wqkv', 'attention.wo',
+                              'feed_forward.w1', 'feed_forward.w2', 'feed_forward.w3']
+        elif self.llm_arch_name == 'Phi3ForCausalLM':
+            target_modules = ['mlp.down_proj', 'mlp.gate_up_proj',
+                              'self_attn.o_proj', 'self_attn.qkv_proj']
+        elif self.llm_arch_name in ['Qwen2ForCausalLM', 'Qwen3ForCausalLM',
+                                    'Qwen3MoeForCausalLM', 'LlamaForCausalLM']:
+            target_modules = ['self_attn.q_proj', 'self_attn.k_proj',
+                              'self_attn.v_proj', 'self_attn.o_proj',
+                              'mlp.gate_proj', 'mlp.down_proj', 'mlp.up_proj']
+        else:
+            raise NotImplementedError(
+                f'LoRA target modules not defined for {self.llm_arch_name}')
+        lora_config = LoraConfig(
+            r=r,
+            target_modules=target_modules,
+            lora_alpha=lora_alpha,
+            lora_dropout=lora_dropout,
+            task_type='CAUSAL_LM',
+        )
+        self.language_model = get_peft_model(self.language_model, lora_config)
+        self.language_model.enable_input_require_grads()
+        self.language_model.print_trainable_parameters()
 
     def replace_img_special_tokens(self, input_embeds, input_ids):
         assert (

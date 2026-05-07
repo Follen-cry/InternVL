@@ -17,16 +17,19 @@
 #   MASTER_PORT           torchrun master_port (default: 34229).
 # =============================================================================
 
-set -x
+export TRITON_CACHE_DIR=/tmp/triton-cache-$USER
+mkdir -p $TRITON_CACHE_DIR
 
-GPUS=${GPUS:-8}
+set -x
+export CUDA_VISIBLE_DEVICES=2,3,4,5
+GPUS=${GPUS:-4}
 BATCH_SIZE=${BATCH_SIZE:-128}
-PER_DEVICE_BATCH_SIZE=${PER_DEVICE_BATCH_SIZE:-2}
+PER_DEVICE_BATCH_SIZE=${PER_DEVICE_BATCH_SIZE:-4}
 GRADIENT_ACC=$((BATCH_SIZE / PER_DEVICE_BATCH_SIZE / GPUS))
 
-: "${INTERNVLU_CKPT:?Set INTERNVLU_CKPT to the InternVL-U base checkpoint path or HF id}"
-: "${META_PATH:?Set META_PATH to the dataset meta JSON}"
-: "${OUTPUT_DIR:?Set OUTPUT_DIR}"
+: "${INTERNVLU_CKPT:=/homes/55/junlin/.cache/huggingface/hub/models--InternVL-U--InternVL-U/snapshots/f012d760e69712bb47f7d3d09a24280f346cee01/vlm}"
+: "${META_PATH:=/scratch/network/ssd2/junlin/ssl_mllm/data/meta/spatial_ssrl_co_sft_meta.json}"
+: "${OUTPUT_DIR:=/scratch/network/ssd2/junlin/models/internvl-u-4epoch}"
 
 export PYTHONPATH="${PYTHONPATH}:$(pwd)"
 export MASTER_PORT=${MASTER_PORT:-34229}
@@ -59,12 +62,11 @@ torchrun \
   --vision_select_layer -1 \
   --dataloader_num_workers 4 \
   --bf16 True \
-  --num_train_epochs 1 \
+  --num_train_epochs 4 \
   --per_device_train_batch_size ${PER_DEVICE_BATCH_SIZE} \
   --gradient_accumulation_steps ${GRADIENT_ACC} \
-  --evaluation_strategy "no" \
-  --save_strategy "steps" \
-  --save_steps 200 \
+  --eval_strategy "no" \
+  --save_strategy "no" \
   --save_total_limit 1 \
   --learning_rate 4e-5 \
   --weight_decay 0.05 \

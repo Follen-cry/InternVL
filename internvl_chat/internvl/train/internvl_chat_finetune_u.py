@@ -393,7 +393,7 @@ class LazySupervisedDataset(Dataset):
             preprocess_function = preprocess_internlm
         elif self.template_name == 'phi3-chat':
             preprocess_function = preprocess_phi3
-        elif self.template_name == 'internvl2_5':
+        elif self.template_name in ('internvl2_5', 'qwen2_5-chat-v3'):
             preprocess_function = preprocess_internvl2_5
         else:
             preprocess_function = preprocess
