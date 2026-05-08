@@ -96,8 +96,9 @@ def link_or_copy_dir(src: Path, dst: Path, *, copy: bool):
 def main():
     ap = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
                                  description=__doc__)
-    ap.add_argument("--vlm", required=True, type=Path,
-                    help="Finetuned/merged VLM directory (has its own config.json + model.safetensors)")
+    ap.add_argument("--vlm", required=False, type=Path, default=None,
+                    help="Finetuned/merged VLM directory (has its own config.json + model.safetensors). "
+                         "Required unless --from-unified is provided.")
     ap.add_argument("--output", required=True, type=Path,
                     help="Where to write the assembled unified pipeline")
     ap.add_argument("--snapshot", type=Path, default=None,
@@ -108,15 +109,39 @@ def main():
                     help="Name of the subcomponent to replace with --vlm (default: vlm)")
     ap.add_argument("--copy-vlm-as-symlink", action="store_true",
                     help="Symlink the VLM instead of copying its bytes (saves disk, less portable)")
+    ap.add_argument("--from-unified", type=Path, default=None,
+                    help=(
+                        "Path to a directory written by InternVLUUnifiedModel.save_pretrained "
+                        "(or merge_lora_u_full.py). When given, EVERY subcomponent that exists "
+                        "under --from-unified is taken from there; only subcomponents that "
+                        "are missing fall back to the snapshot. --vlm and --replace continue "
+                        "to take precedence for the named subcomponent."
+                    ))
     ap.add_argument("--force", action="store_true",
                     help="Overwrite --output if it already exists")
     args = ap.parse_args()
 
-    vlm_src: Path = args.vlm.resolve()
-    if not vlm_src.is_dir():
-        sys.exit(f"--vlm path is not a directory: {vlm_src}")
-    if not (vlm_src / "config.json").is_file():
-        sys.exit(f"--vlm dir is missing config.json: {vlm_src}")
+    if args.vlm is None and args.from_unified is None:
+        sys.exit("Either --vlm or --from-unified must be provided.")
+
+    unified_src: Path = args.from_unified.resolve() if args.from_unified is not None else None
+    if unified_src is not None and not unified_src.is_dir():
+        sys.exit(f"--from-unified path is not a directory: {unified_src}")
+
+    if args.vlm is not None:
+        vlm_src: Path = args.vlm.resolve()
+        if not vlm_src.is_dir():
+            sys.exit(f"--vlm path is not a directory: {vlm_src}")
+        if not (vlm_src / "config.json").is_file():
+            sys.exit(f"--vlm dir is missing config.json: {vlm_src}")
+    else:
+        # Fall back to the unified dir's vlm subdir.
+        vlm_candidate = unified_src / args.replace if unified_src is not None else None
+        if vlm_candidate is None or not vlm_candidate.is_dir():
+            sys.exit(
+                f"--vlm not provided and --from-unified does not contain a {args.replace}/ subdir."
+            )
+        vlm_src = vlm_candidate.resolve()
 
     snapshot = (args.snapshot or find_snapshot(args.repo_id)).resolve()
     if not (snapshot / "model_index.json").is_file():
@@ -153,6 +178,12 @@ def main():
             link_or_copy_dir(vlm_src, dst_sub, copy=not args.copy_vlm_as_symlink)
             mode = "symlinked" if args.copy_vlm_as_symlink else "copied"
             print(f"[new ] {name}: {mode} from {vlm_src}")
+            continue
+
+        if unified_src is not None and (unified_src / name).is_dir():
+            # Take this subcomponent from the unified training output rather than the snapshot.
+            link_or_copy_dir((unified_src / name).resolve(), dst_sub, copy=False)
+            print(f"[link] {name} -> {(unified_src / name).resolve()}  (from --from-unified)")
         else:
             link_or_copy_dir(src_sub, dst_sub, copy=False)
             print(f"[link] {name} -> {src_sub}")
