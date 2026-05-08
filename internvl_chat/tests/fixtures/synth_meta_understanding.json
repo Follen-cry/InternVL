@@ -1,0 +1,10 @@
+{
+  "synth_understanding": {
+    "root": "/scratch/network/ssd2/junlin/ssl_mllm/InternVL/internvl_chat/tests/fixtures/synth_images",
+    "annotation": "/scratch/network/ssd2/junlin/ssl_mllm/InternVL/internvl_chat/tests/fixtures/synth_understanding.jsonl",
+    "data_augment": false,
+    "max_dynamic_patch": 1,
+    "repeat_time": 1,
+    "length": 4
+  }
+}

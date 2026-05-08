@@ -1,0 +1,4 @@
+{"id": 0, "task_type": "imgen", "caption": "A red square on a white background.", "target_image": "g_0.jpg"}
+{"id": 1, "task_type": "imgen", "caption": "A green square on a white background.", "target_image": "g_1.jpg"}
+{"id": 2, "task_type": "imgen", "caption": "A blue square on a white background.", "target_image": "g_2.jpg"}
+{"id": 3, "task_type": "imgen", "caption": "A yellow square on a white background.", "target_image": "g_3.jpg"}

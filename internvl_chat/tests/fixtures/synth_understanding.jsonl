@@ -1,0 +1,4 @@
+{"id": 0, "image": "u_0.jpg", "conversations": [{"from": "human", "value": "<image>\nWhat color is the image #0?"}, {"from": "gpt", "value": "It is a single-color test image."}]}
+{"id": 1, "image": "u_1.jpg", "conversations": [{"from": "human", "value": "<image>\nWhat color is the image #1?"}, {"from": "gpt", "value": "It is a single-color test image."}]}
+{"id": 2, "image": "u_2.jpg", "conversations": [{"from": "human", "value": "<image>\nWhat color is the image #2?"}, {"from": "gpt", "value": "It is a single-color test image."}]}
+{"id": 3, "image": "u_3.jpg", "conversations": [{"from": "human", "value": "<image>\nWhat color is the image #3?"}, {"from": "gpt", "value": "It is a single-color test image."}]}
